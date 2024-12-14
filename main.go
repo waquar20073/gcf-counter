@@ -60,9 +60,16 @@ func handleIncrement(w http.ResponseWriter, r *http.Request) {
 	// Query the sequence by name
 	query := "SELECT id, sequence_count FROM website_hit_sequence WHERE sequence_name = ?"
 	err = tx.QueryRow(query, sequenceName).Scan(&id, &sequenceCount)
+
 	if err != nil {
-		tx.Rollback()
-		sendErrorResponse(w, err)
+		if err == sql.ErrNoRows {
+			// Handle case where no sequence was found
+			sendNotFoundResponse(w)
+		} else {
+			// Handle other SQL errors
+			tx.Rollback()
+			sendErrorResponse(w, err)
+		}
 		return
 	}
 
@@ -101,6 +108,31 @@ func sendErrorResponse(w http.ResponseWriter, err error) {
 	json.NewEncoder(w).Encode(responseBody)
 }
 
+// Send a not-found response for missing sequence
+func sendNotFoundResponse(w http.ResponseWriter) {
+	responseBody := ResponseBody{
+		VisitCount: -1,
+		Error:      "sequence not found",
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusNotFound)
+	json.NewEncoder(w).Encode(responseBody)
+}
+
+// CORS Middleware
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	// Load configuration
 	config, err := loadConfig("config.json")
@@ -124,10 +156,11 @@ func main() {
 	}
 
 	// Set up routes
-	http.HandleFunc("/increment", handleIncrement)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/increment", handleIncrement)
 
-	// Start server
+	// Apply CORS middleware
 	port := config.Port
 	log.Printf("Server is running on port %d...", port)
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), corsMiddleware(mux)))
 }
