@@ -3,5 +3,6 @@
     "db_port": 3306,
     "db_user": "your_user",
     "db_password": "your_password",
-    "db_name": ""
+    "db_name": "",
+    "port": 8080
 }
