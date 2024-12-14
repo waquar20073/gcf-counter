@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -18,6 +17,7 @@ type Config struct {
 	DBUser     string `json:"db_user"`
 	DBPassword string `json:"db_password"`
 	DBName     string `json:"db_name"`
+	Port       int    `json:"port"`
 }
 
 type ResponseBody struct {
@@ -127,7 +127,7 @@ func main() {
 	http.HandleFunc("/increment", handleIncrement)
 
 	// Start server
-	port := 8080
+	port := config.Port
 	log.Printf("Server is running on port %d...", port)
-	log.Fatal(http.ListenAndServe(":"+strconv.Itoa(port), nil))
+	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), nil))
 }
